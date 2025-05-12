@@ -1,0 +1,218 @@
+---
+title: "Analysis of Comorbidities v2"
+output:
+  html_document:
+    df_print: paged
+editor_options:
+  chunk_output_type: console
+---
+
+
+# Load required libraries
+```{r}
+library(gtsummary)
+library(tidyr)
+library(dplyr)
+library(epitools)
+library(ggplot2)
+library(plotly)
+```
+
+# Load data
+```{r}
+dat <- read.csv("data/a1_fixed_corrected.csv")
+```
+
+# Get a list of unique comorbidities
+```{r}
+dat_expanded <- dat %>%
+  separate_longer_delim(comorbidity, delim=",")
+dat_expanded$comorbidity <- trimws(dat_expanded$comorbidity)
+uniqueComorbidities <- unique(trimws(dat_expanded$comorbidity))
+```
+
+# Calculate total number of cases and controls
+```{r}
+total_cases <- sum(dat$group == "case")
+total_controls <- sum(dat$group == "control")
+```
+
+# Test one comorbidity
+Take example of "Essential hypertension"
+```{r}
+case_with_comorbid_count <- sum(dat_expanded$group == "case" & dat_expanded$comorbidity == "Essential hypertension")
+control_with_comorbid_count <- sum(dat_expanded$group == "control" & dat_expanded$comorbidity == "Essential hypertension")
+case_without_comorbid_count <- total_cases - case_with_comorbid_count
+control_without_comorbid_count <- total_controls - control_with_comorbid_count
+
+mat <- matrix(c(case_with_comorbid_count, control_with_comorbid_count, case_without_comorbid_count, control_without_comorbid_count),
+              nrow=2, byrow=T)
+group <- c("case", "control")
+hypertension <- c("yes", "no")
+dimnames(mat) <- list(hypertension, group)
+mat
+
+or <- oddsratio.fisher(mat)
+or
+```
+
+# Test several comorbidities
+```{r}
+comorbids <- c("Acne", "Acquired hypothyroidism", "Acute myocarditis", "Acute non-ST segment elevation myocardial infarction", "Acute pericarditis", "Acute vascular insufficiency of intestine", "Alcohol abuse", "Allergic contact dermatitis caused by plant material", "Allergic contact dermatitis due to adhesive", "Anorexia nervosa", "antepartum", "Arteriosclerosis of coronary artery bypass graft", "Arteriosclerosis of coronary artery bypass graft of transplanted heart", "Atherosclerosis of artery of lower limb", "Autoimmune hepatitis", "Benign essential hypertension", "Calcium oxalate calculus of kidney", "Calculus of kidney and ureter", "Carotid artery aneurysm", "Carotid sinus syncope", "childbirth and puerperium", "childbirth and the puerperium", "Chronic nephritic syndrome", "Contact dermatitis", "Contact dermatitis due to plants", "Delayed postmyocardial infarction pericarditis", "Drug-induced systemic lupus erythematosus", "Eczema", "Erectile dysfunction", "Essential hypertension", "except food", "Extreme obesity with alveolar hypoventilation", "Extreme obesity with alveolar hypoventilation", "Guttate psoriasis", "Hidradenitis suppurativa", "Hydronephrosis co-occurrent and due to calculus of kidney and ureter", "Hypertensive urgency", "Hypertrophy of fat pad of knee", "Hypothyroidism", "Idiopathic generalized epilepsy", "Insulin treated type 2 diabetes mellitus", "Irritant contact dermatitis", "Kidney stone", "Lichen planus", "Loss of appetite", "Malignant hypertensive end stage renal disease", "Maternal obesity complicating pregnancy", "Maternal obesity syndrome", "Morbid obesity", "Myocardial infarction due to demand ischemia", "Myocarditis", "Obesity", "Obesity in mother complicating childbirth", "Postablative hypothyroidism", "Postoperative hypothyroidism", "Pre-existing hypertension complicating pregnancy", "Psoriasis", "Psoriasis vulgaris", "Psoriasis with arthropathy", "Pulmonary congestion and hypostasis", "restricting type", "Scalp psoriasis", "Seborrheic dermatitis", "Secondary erectile dysfunction", "Systemic lupus erythematosus", "Thyrotoxicosis without goiter or other cause", "Trauma and postoperative pulmonary insufficiency", "Tubulointerstitial nephritis", "Type 2 diabetes mellitus", "Type 2 diabetes mellitus without complication", "Uric acid renal calculus")
+```
+
+Check overlap between comorbidities in dataset and list of comorbities from collaborator.
+```{r}
+intersect(dat_expanded$comorbidity, comorbids)
+```
+This gives us the values that are common to both vectors.
+
+
+```{r}
+resultsNames <- c("Comorbidity", "Case_count", "Control_count", "Case_percentage",
+                  "Control_percentage", "Odds_ratio", "CI_lower", "CI_upper", "p_value")
+results <- data.frame(matrix(NA, nrow=length(comorbids), ncol=length(resultsNames)))
+names(results) <- resultsNames
+```
+
+```{r}
+for (i in 1:length(comorbids)) {
+  case_with_comorbid_count <- sum(dat_expanded$group == "case" & dat_expanded$comorbidity == comorbids[i])
+control_with_comorbid_count <- sum(dat_expanded$group == "control" & dat_expanded$comorbidity == comorbids[i])
+case_without_comorbid_count <- total_cases - case_with_comorbid_count
+control_without_comorbid_count <- total_controls - control_with_comorbid_count
+
+mat <- matrix(c(case_with_comorbid_count, control_with_comorbid_count, case_without_comorbid_count, control_without_comorbid_count),
+              nrow=2, byrow=T)
+res <- oddsratio.fisher(mat)
+
+results$Comorbidity[i] <- comorbids[i]
+results$Case_count[i] <-  case_with_comorbid_count
+results$Control_count[i] <- control_with_comorbid_count
+results$Case_percentage[i] <- case_with_comorbid_count/total_cases *100
+results$Control_percentage[i] <- control_with_comorbid_count/total_controls *100
+results$Odds_ratio[i] <- res$measure[2,1]
+results$CI_lower[i] <- res$measure[2,2]
+results$CI_upper[i] <- res$measure[2,3]
+results$p_value[i] <- res$p.value[2,1]
+}
+```
+
+
+# Correction for multiple comparisons
+```{r}
+results <- results %>% mutate(fdr=p.adjust(p_value, method="fdr"))
+```
+
+```{r}
+knitr::kable(results)
+```
+
+```{r}
+unique(dat$comorbidity, comorbids)
+```
+
+
+```{r}
+library(ggplot2)
+ggplot(data=results, aes(x=reorder(Comorbidity, Odds_ratio), y=Odds_ratio)) + 
+  geom_col() +
+  coord_flip() + 
+  theme_minimal() + 
+  labs(title="Comorbidity vs. Odds Ratio",
+       x="Comorbidity",
+       y="Odds Ratio") +
+  geom_hline(yintercept = 1, linetype="dashed", color="red")  # Adds a reference line at OR=1
+```
+
+```{r}
+library(ggplot2)
+library(dplyr)
+library(stringr)
+
+# Optional cleaning of spaces or weird formatting
+results <- results %>%
+  mutate(Comorbidity = str_squish(as.character(Comorbidity)),
+         Comorbidity_wrapped = str_wrap(Comorbidity, width = 30))  # Wrap labels
+
+# Plot with wrapped labels
+ggplot(data = results, aes(x = reorder(Comorbidity_wrapped, Odds_ratio), y = Odds_ratio)) + 
+  geom_col(fill = "#4E79A7") +
+  coord_flip() + 
+  theme_minimal(base_size = 12) + 
+  labs(title = "Comorbidity vs. Odds Ratio",
+       x = "Comorbidity",
+       y = "Odds Ratio") +
+  geom_hline(yintercept = 1, linetype = "dashed", color = "red") +
+  theme(axis.text.y = element_text(size = 10))
+```
+
+
+```{r}
+library(ggplot2)
+library(tidyr)
+library(dplyr)
+
+# Normalize values to range between -1 and 1
+normalize <- function(x) {
+  return(2 * ((x - min(x, na.rm=TRUE)) / (max(x, na.rm=TRUE) - min(x, na.rm=TRUE))) - 1)
+}
+
+# Convert data from wide to long format (including Odds Ratio, P-Value, and Case Percentage)
+results_long <- results %>%
+  pivot_longer(cols = c(Odds_ratio, p_value, Case_percentage), 
+               names_to = "Metric", values_to = "Value") %>%
+  group_by(Metric) %>%
+  mutate(Normalized_Value = normalize(Value))  # Apply normalization per metric
+
+# Create heatmap
+ggplot(results_long, aes(x=Metric, y=reorder(Comorbidity, Normalized_Value))) + 
+  geom_tile(aes(fill=Normalized_Value), color="white") +  
+  scale_fill_gradientn(colors = c("blue", "white", "red"), 
+                       limits = c(-1, 1),  # Ensures scale stays between -1 and 1
+                       name="Normalized Value") +  
+  theme_minimal() + 
+  labs(title="Heatmap of Odds Ratios, P-Values, and Case Percentages (Normalized)",
+       x="Metric",
+       y="Comorbidity") +
+  theme(axis.text.x = element_text(angle=45, hjust=1))
+```
+
+
+```{r}
+# Define significance thresholds
+odds_ratio_threshold_upper <- 1.5 
+odds_ratio_threshold_lower <-0.5 # Adjust based on what is considered "upregulated/downregulated"
+fdr_threshold <- 0.05        # Common threshold for signgetificance
+
+# Classify comorbidities based on thresholds
+results2 <- results %>%
+  mutate(Significance = case_when(Odds_ratio >= odds_ratio_threshold_upper & fdr < fdr_threshold ~ "Upregulated", Odds_ratio <= (odds_ratio_threshold_lower) & fdr < fdr_threshold ~ "Downregulated", TRUE ~ "Not Significant"))
+```
+<!---
+```{r}
+# Create volcano plot
+ggplot(results2, aes(x=Odds_ratio, y=-log10(fdr), color=Significance)) + 
+  geom_point(alpha=0.8, size=3) + # Scatter plot points
+  scale_x_log10(breaks=c(0.1, 1, 10), labels=c("0.1", "1", "10")) +
+   scale_color_manual(values=c("Upregulated"="red", "Downregulated"="blue", "Not Significant"="grey")) + geom_hline(yintercept=-log10(fdr_threshold), linetype="dashed", color="black") +  # FDR threshold line
+geom_vline(xintercept=c(odds_ratio_threshold_lower, odds_ratio_threshold_upper), linetype="dashed", color="black") +  # Odds ratio threshold lines
+theme_minimal() + labs(title="Volcano Plot of Comorbidities", x="Log2(Odds Ratio)", y="-Log10(FDR)", color="Regulation Status") + theme(legend.position="right")
+```
+--->
+
+```{r}
+# Create volcano plot
+p <- ggplot(results2, aes(x=Odds_ratio, y=-log10(fdr), color=Significance, text=paste( "Comorbidity:", Comorbidity, "<br>","Odds Ratio:", round(Odds_ratio, 2), "<br>", "FDR:", signif(fdr, 3)) )) + # Scatter plot points
+  geom_point(alpha=0.8, size=3) +
+  scale_x_log10(breaks=c(0.1, 1, 10), labels=c("0.1", "1", "10")) +
+   scale_color_manual(values=c("Upregulated"="red", "Downregulated"="blue", "Not Significant"="grey")) + geom_hline(yintercept=-log10(fdr_threshold), linetype="dashed", color="black") +  # FDR threshold line
+geom_vline(xintercept=c(odds_ratio_threshold_lower, odds_ratio_threshold_upper), linetype="dashed", color="black") +  # Odds ratio threshold lines
+theme_minimal() + labs(title="Volcano Plot of Comorbidities", x="Log2(Odds Ratio)", y="-Log10(FDR)", color="Regulation Status") + theme(legend.position="right")
+ggplotly(p, tooltip="text")
+```
+
+```{r}
+write.csv(results2, "volcano_raw_data.csv", row.names = FALSE)
+```
+
