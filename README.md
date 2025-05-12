@@ -178,3 +178,10 @@ If you use these scripts in your research, please consider citing this repositor
 
 This repository is licensed under the MIT License. See the LICENSE file for more details.
 
+# Analysis of Inflammatory Bowel Disease Comorbidities
+
+## Authors
+- Soham Sudhakaran - Beth Israel Diaconess Center/ Acton-Boxborough Regional High School - soham.sudhakaran@gmail.com
+- Sudhakaran Prabakaran - NonExomics/Northeastern University - s.prabakaran@northeastern.edu
+- Matthew Wayland - University of Cambridge - mw283@cam.ac.uk 
+
