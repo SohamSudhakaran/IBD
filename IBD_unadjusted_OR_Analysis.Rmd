@@ -208,7 +208,7 @@ p <- ggplot(results2, aes(x=Odds_ratio, y=-log10(fdr), color=Significance, text=
   scale_x_log10(breaks=c(0.1, 1, 10), labels=c("0.1", "1", "10")) +
    scale_color_manual(values=c("Increased morbidity"="red", "Decreased morbidity"="blue", "Not Significant"="grey")) + geom_hline(yintercept=-log10(fdr_threshold), linetype="dashed", color="black") +  # FDR threshold line
 geom_vline(xintercept=c(odds_ratio_threshold_lower, odds_ratio_threshold_upper), linetype="dashed", color="black") +  # Odds ratio threshold lines
-theme_minimal() + labs(title="Volcano Plot of Comorbidities", x="Odds Ratio", y="-Log10(FDR)", color="Regulation Status") + theme(legend.position="right")
+theme_minimal() + labs(title="Volcano Plot of Comorbidities", x="Odds Ratio", y="-Log10(FDR)", color="") + theme(legend.position="right")
 ggplotly(p, tooltip="text")
 ```
 
